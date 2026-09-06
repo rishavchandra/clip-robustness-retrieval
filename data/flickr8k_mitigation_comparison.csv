@@ -1,0 +1,4 @@
+model,condition,severity,method,Recall@1,Recall@5,Recall@10,MRR,Mean Rank,Median Rank,Δ Recall@1,Δ MRR
+SigLIP ViT-B/16,blur+noise,severe,baseline,0.1772,0.3466,0.4406,0.263725,84.5124,16.0,0.0,0.0
+SigLIP ViT-B/16,blur+noise,severe,multiview,0.163,0.3312,0.4216,0.2480751064025977,91.1426,18.0,-0.01419999999999999,-0.015649893597402292
+SigLIP ViT-B/16,blur+noise,severe,restoration,0.1042,0.2198,0.2906,0.1675359491817893,156.2622,50.0,-0.073,-0.09618905081821069
