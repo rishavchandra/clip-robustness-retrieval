@@ -31,7 +31,7 @@ st.set_page_config(
 
 #model
 
-@st.cache_resource
+@st.cache_resource(max_entries=1)
 
 def load_clip_model(model_choice):
 
