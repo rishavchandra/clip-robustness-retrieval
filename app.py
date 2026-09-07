@@ -12,6 +12,9 @@ import torch
 
 import open_clip
 
+import gc
+import threading
+
 from PIL import Image, ImageFilter, ImageDraw
 
 
@@ -31,73 +34,111 @@ st.set_page_config(
 
 #model
 
-@st.cache_resource(max_entries=1)
+class ModelManager:
+    def __init__(self):
+        self.model_choice = None
+        self.bundle = None
+        self.lock = threading.Lock()
+
+    def unload(self):
+        if self.bundle is not None:
+            old_model = self.bundle[0]
+
+            self.bundle = None
+            self.model_choice = None
+
+            del old_model
+            gc.collect()
+
+    def get(self, model_choice):
+        with self.lock:
+            if (
+                self.bundle is not None
+                and self.model_choice == model_choice
+            ):
+                return self.bundle
+
+            self.unload()
+
+            device = (
+                "mps"
+                if torch.backends.mps.is_available()
+                else "cpu"
+            )
+
+            if model_choice == "CLIP ViT-B/32":
+                model_name = "ViT-B-32"
+
+                model, _, preprocess = (
+                    open_clip.create_model_and_transforms(
+                        model_name,
+                        pretrained="openai",
+                    )
+                )
+
+                tokenizer = open_clip.get_tokenizer(
+                    model_name
+                )
+
+            elif model_choice == "CLIP ViT-L/14":
+                model_name = "ViT-L-14"
+
+                model, _, preprocess = (
+                    open_clip.create_model_and_transforms(
+                        model_name,
+                        pretrained="openai",
+                    )
+                )
+
+                tokenizer = open_clip.get_tokenizer(
+                    model_name
+                )
+
+            elif model_choice == "SigLIP ViT-B/16":
+                model_name = (
+                    "hf-hub:timm/ViT-B-16-SigLIP"
+                )
+
+                model, _, preprocess = (
+                    open_clip.create_model_and_transforms(
+                        model_name
+                    )
+                )
+
+                tokenizer = open_clip.get_tokenizer(
+                    model_name
+                )
+
+            else:
+                raise ValueError(
+                    f"Unknown model: {model_choice}"
+                )
+
+            model = model.to(device)
+            model.eval()
+
+            if hasattr(model, "visual"):
+                model.visual = None
+                gc.collect()
+
+            self.model_choice = model_choice
+            self.bundle = (
+                model,
+                preprocess,
+                tokenizer,
+                device,
+            )
+
+            return self.bundle
+
+
+@st.cache_resource
+def get_model_manager():
+    return ModelManager()
+
 
 def load_clip_model(model_choice):
-
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
-
-    if model_choice == "CLIP ViT-B/32":
-
-        model_name = "ViT-B-32"
-
-        pretrained = "openai"
-
-        model, _, preprocess = open_clip.create_model_and_transforms(
-
-            model_name,
-
-            pretrained=pretrained,
-
-        )
-
-        tokenizer = open_clip.get_tokenizer(model_name)
-
-    elif model_choice == "CLIP ViT-L/14":
-
-        model_name = "ViT-L-14"
-
-        pretrained = "openai"
-
-        model, _, preprocess = open_clip.create_model_and_transforms(
-
-            model_name,
-
-            pretrained=pretrained,
-
-        )
-
-        tokenizer = open_clip.get_tokenizer(model_name)
-
-    elif model_choice == "SigLIP ViT-B/16":
-
-        model_name = "hf-hub:timm/ViT-B-16-SigLIP"
-
-        model, _, preprocess = open_clip.create_model_and_transforms(
-
-            model_name
-
-        )
-
-        tokenizer = open_clip.get_tokenizer(
-
-            model_name
-
-        )
-
-    else:
-
-        raise ValueError(
-
-            f"Unknown model: {model_choice}"
-
-        )
-
-    model = model.to(device)
-
-    model.eval()
-
-    return model, preprocess, tokenizer, device
+    return get_model_manager().get(model_choice)
 
 
 
